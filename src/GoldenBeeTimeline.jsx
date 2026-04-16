@@ -117,13 +117,14 @@ export default function GoldenBeeTimeline() {
         (events || []).map((event) => ({
           key: `custom:${event.id}`,
           eventId: event.id,
-          type: "event",
+          type: event.kind === "phase" ? "phase" : "event",
           title: event.title,
           subtitle: event.subtitle,
           items: event.note ? [{ id: `custom-note:${event.id}`, text: event.note, isImportant: false }] : [],
           extraItems: [],
           highlight: "",
           isCustom: true,
+          kind: event.kind || "event",
         }))
       );
     }
@@ -324,17 +325,24 @@ const toggleImportant = async (item) => {
   loadTasks();
 };
 
-const addCustomEvent = async () => {
-  const title = window.prompt("노란 일정 박스의 상단 기간/라벨을 입력해주세요.");
+const addCustomBox = async (kind) => {
+  const isYellow = kind === "event";
+  const title = window.prompt(
+    isYellow
+      ? "노란 일정 박스의 상단 기간/라벨을 입력해주세요."
+      : "일반 박스의 상단 기간/라벨을 입력해주세요."
+  );
   if (!title) return;
 
-  const subtitle = window.prompt("노란 일정 박스의 제목을 입력해주세요.");
+  const subtitle = window.prompt(
+    isYellow ? "노란 일정 박스의 제목을 입력해주세요." : "일반 박스의 제목을 입력해주세요."
+  );
   if (!subtitle) return;
 
   const note = window.prompt("박스 안에 넣을 설명을 입력해주세요. 비워도 됩니다.") || "";
   const { data, error } = await supabase
     .from("timeline_custom_events")
-    .insert({ title, subtitle, note })
+    .insert({ kind, title, subtitle, note })
     .select("*")
     .single();
 
@@ -347,21 +355,22 @@ const addCustomEvent = async () => {
   const newEvent = {
     key: `custom:${data.id}`,
     eventId: data.id,
-    type: "event",
+    type: data.kind === "phase" ? "phase" : "event",
     title: data.title,
     subtitle: data.subtitle,
     items: data.note ? [{ id: `custom-note:${data.id}`, text: data.note, isImportant: false }] : [],
     extraItems: [],
     highlight: "",
     isCustom: true,
+    kind: data.kind,
   };
 
   setCustomEvents((prev) => [...prev, newEvent]);
   setPhaseOrder((prev) => [...prev, newEvent.key]);
 };
 
-const updateCustomEvent = async (eventKey) => {
-  const targetEvent = customEvents.find((event) => event.key === eventKey);
+const updateCustomBox = async (phaseKey) => {
+  const targetEvent = customEvents.find((event) => event.key === phaseKey);
   if (!targetEvent) return;
 
   const nextTitle = window.prompt("상단 기간/라벨 수정", targetEvent.title);
@@ -386,7 +395,7 @@ const updateCustomEvent = async (eventKey) => {
 
   setCustomEvents((prev) =>
     prev.map((event) =>
-      event.key === eventKey
+      event.key === phaseKey
         ? {
             ...event,
             title: nextTitle,
@@ -399,11 +408,13 @@ const updateCustomEvent = async (eventKey) => {
 };
 
 const removeCustomEvent = async (eventKey) => {
-  const ok = window.confirm("이 노란 일정 박스를 삭제할까요?");
-  if (!ok) return;
-
   const targetEvent = customEvents.find((event) => event.key === eventKey);
   if (!targetEvent) return;
+
+  const ok = window.confirm(
+    targetEvent.kind === "phase" ? "이 일반 박스를 삭제할까요?" : "이 노란 일정 박스를 삭제할까요?"
+  );
+  if (!ok) return;
 
   const { error } = await supabase
     .from("timeline_custom_events")
@@ -542,14 +553,25 @@ const movePhase = (fromKey, toKey) => {
     <div
       key={phase.key}
       draggable
-      onDragStart={() => setDraggedPhaseKey(phase.key)}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={() => {
+      onDragStart={(event) => {
+        setDraggedPhaseKey(phase.key);
+        event.dataTransfer.effectAllowed = "move";
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      }}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        if (!draggedPhaseKey || draggedPhaseKey === phase.key) return;
         movePhase(draggedPhaseKey, phase.key);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
         setDraggedPhaseKey(null);
       }}
       onDragEnd={() => setDraggedPhaseKey(null)}
-      className="cursor-move"
+      className={`cursor-move ${draggedPhaseKey === phase.key ? "opacity-70" : ""}`}
     >
       {content}
     </div>
@@ -650,7 +672,7 @@ const movePhase = (fromKey, toKey) => {
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => updateCustomEvent(phase.key)}
+                onClick={() => updateCustomBox(phase.key)}
                 className="rounded-md p-2 text-gray-600 transition hover:bg-yellow-200/70 hover:text-black"
                 aria-label="박스 수정"
               >
@@ -740,7 +762,29 @@ const movePhase = (fromKey, toKey) => {
       <div className="relative pl-7 max-[767px]:pl-5">
       <div className="absolute -left-[12px] top-2 h-5 w-5 rounded-full border-4 border-black bg-white max-[767px]:-left-[10px] max-[767px]:h-4 max-[767px]:w-4 max-[767px]:border-[3px]" />
       <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 shadow-sm max-[767px]:p-4">
-        <div className="text-xs font-semibold text-gray-500 mb-1">{phase.title}</div>
+        <div className="mb-1 flex items-start justify-between gap-3">
+          <div className="text-xs font-semibold text-gray-500">{phase.title}</div>
+          {phase.isCustom ? (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => updateCustomBox(phase.key)}
+                className="rounded-md p-2 text-gray-600 transition hover:bg-gray-100 hover:text-black"
+                aria-label="박스 수정"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => removeCustomEvent(phase.key)}
+                className="rounded-md p-2 text-gray-600 transition hover:bg-gray-100 hover:text-black"
+                aria-label="박스 삭제"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ) : null}
+        </div>
         <h2 className="mb-3 text-xl font-bold leading-tight max-[767px]:text-lg">{phase.subtitle}</h2>
         {renderPrioritySection(phase)}
         {renderChecklist(phase.items, phaseIndex, "items")}
@@ -870,8 +914,9 @@ const movePhase = (fromKey, toKey) => {
 
   return (
     <>
-      <div className="p-4 max-[767px]:px-4 max-[767px]:pt-4">
-        <div className="flex flex-wrap gap-2">
+      <div className="sticky top-0 z-20 border-b border-gray-200/80 bg-white/95 px-4 py-3 backdrop-blur max-[767px]:px-4">
+        <div className="mx-auto flex max-w-5xl justify-center">
+          <div className="flex flex-wrap justify-center gap-2">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -886,10 +931,11 @@ const movePhase = (fromKey, toKey) => {
               {tab.label}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
-      <div className="min-h-screen bg-white p-5 font-sans max-[767px]:px-4 max-[767px]:pb-8 max-[767px]:pt-2">
+      <div className="min-h-screen bg-white p-5 pt-6 font-sans max-[767px]:px-4 max-[767px]:pb-8 max-[767px]:pt-4">
         <div className="max-w-5xl mx-auto">
           <h1 className="mb-2 text-3xl font-bold leading-tight max-[767px]:text-2xl">
             더 골든비 신규 쇼핑몰 구축 타임라인
@@ -900,10 +946,17 @@ const movePhase = (fromKey, toKey) => {
 
           {activeTab === "timeline" ? (
             <>
-              <div className="mb-4 flex justify-end">
+              <div className="mb-4 flex flex-wrap justify-end gap-2">
                 <button
                   type="button"
-                  onClick={addCustomEvent}
+                  onClick={() => addCustomBox("phase")}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-400 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+                >
+                  <Plus className="h-4 w-4" /> 일반 박스 추가
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addCustomBox("event")}
                   className="inline-flex items-center gap-2 rounded-lg border border-yellow-500 bg-yellow-50 px-3 py-2 text-sm font-semibold text-yellow-700 hover:bg-yellow-100"
                 >
                   <Plus className="h-4 w-4" /> 노란 일정 박스 추가
@@ -916,14 +969,13 @@ const movePhase = (fromKey, toKey) => {
                     : renderPhase(phase, phase.baseIndex)
                 )}
               </div>
-              {renderGanttSection()}
-              {renderInfoSections()}
             </>
           ) : null}
 
           {activeTab === "gantt" ? (
             <>
               {renderGanttSection()}
+              {renderInfoSections()}
               <div className="mt-6 rounded-[28px] border-2 border-black bg-gray-50 p-5 max-[767px]:rounded-2xl max-[767px]:p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <h3 className="text-xl font-bold max-[767px]:text-lg">메모장</h3>

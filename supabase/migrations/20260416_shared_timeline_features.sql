@@ -13,11 +13,15 @@ create table if not exists public.timeline_state (
 
 create table if not exists public.timeline_custom_events (
   id uuid primary key default gen_random_uuid(),
+  kind text not null default 'event',
   title text not null,
   subtitle text not null,
   note text not null default '',
   created_at timestamptz not null default now()
 );
+
+alter table public.timeline_custom_events
+add column if not exists kind text not null default 'event';
 
 insert into public.timeline_state (id, memo, phase_order)
 values ('main', '', '{}')
