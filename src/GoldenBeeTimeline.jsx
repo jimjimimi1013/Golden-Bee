@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Plus, Trash2, Pencil, Star } from "lucide-react";
+import { Check, Plus, Trash2, Pencil, Star, ChevronUp, ChevronDown } from "lucide-react";
 import { supabase } from "./lib/supabase";
 
 const MAIN_STATE_ID = "main";
@@ -10,8 +10,8 @@ export default function GoldenBeeTimeline() {
   const [activeTab, setActiveTab] = useState("timeline");
   const [memoText, setMemoText] = useState("");
   const [customEvents, setCustomEvents] = useState([]);
+  const [infoCards, setInfoCards] = useState([]);
   const [phaseOrder, setPhaseOrder] = useState([]);
-  const [draggedPhaseKey, setDraggedPhaseKey] = useState(null);
   const [sharedStateReady, setSharedStateReady] = useState(false);
   const ganttColumns = ["4월 중순", "4월 말", "5월 초", "5월 말", "6월 초", "6월 중순"];
   const ganttRows = [
@@ -22,26 +22,6 @@ export default function GoldenBeeTimeline() {
     { label: "내부 제작 병행", bars: [1, 2, 3], color: "bg-gray-500" },
     { label: "QA / 테스트", bars: [4], color: "bg-black" },
     { label: "오픈 준비 / 런칭", bars: [4, 5], color: "bg-yellow-500" },
-  ];
-  const referenceInfo = [
-    "모든 개발 및 디자인 작업은 6월을 데드라인으로 ASAP 진행",
-    "더 골든비는 현재 금이 들어간 소형 장식을 붙인 액자만 판매 (초기 기준)",
-    "제품 포장 방식: 한지 포장 + 금박 더 골든비 스티커 부착 예정",
-    "액자 사이즈는 고정 -> 사이즈 변경 시, 다른 규격의 제품을 선택하는 구조",
-    "서브타이틀은 변경 가능한 폰트는 2~3종으로 제한 (디자인 통일성 유지 목적)",
-    "사이트 오픈과 동시에 SNS 광고 진행 예정 (인스타그램, 틱톡 중심)",
-    "액자 카테고리 확장 순서 -> 효도 / 부모님 / 사랑 -> 골프 -> 기업용",
-    "인사이트 제품 상세페이지의 뷰 형태는 더보기 형태 또는 새창 구조로 진행 검토",
-  ];
-  const ownerChecks = [
-    "4월: 개발사 최종 선정 / 계약 조건 확정",
-    "5월 초: 상세/영상 기획 컨펌",
-    "6월 초: 오픈",
-  ];
-  const risks = [
-    "개발사 선정 지연 시 전체 일정 지연",
-    "PDF 오류 발생 시 QA 연장 가능",
-    "촬영 지연 시 상세페이지 일정 영향",
   ];
   const tabs = [
     { id: "timeline", label: "타임라인" },
@@ -104,10 +84,19 @@ export default function GoldenBeeTimeline() {
   }, []);
 
   const loadSharedState = useCallback(async () => {
-    const [{ data: events, error: eventsError }, { data: state, error: stateError }] =
+    const [
+      { data: events, error: eventsError },
+      { data: state, error: stateError },
+      { data: cards, error: cardsError },
+    ] =
       await Promise.all([
         supabase.from("timeline_custom_events").select("*").order("created_at", { ascending: true }),
         supabase.from("timeline_state").select("*").eq("id", MAIN_STATE_ID).maybeSingle(),
+        supabase
+          .from("timeline_info_cards")
+          .select("*")
+          .order("sort_order", { ascending: true })
+          .order("created_at", { ascending: true }),
       ]);
 
     if (eventsError) {
@@ -134,6 +123,12 @@ export default function GoldenBeeTimeline() {
     } else {
       setMemoText(state?.memo || "");
       setPhaseOrder(state?.phase_order || []);
+    }
+
+    if (cardsError) {
+      console.log(cardsError);
+    } else {
+      setInfoCards(cards || []);
     }
 
     setSharedStateReady(true);
@@ -431,19 +426,98 @@ const removeCustomEvent = async (eventKey) => {
   setPhaseOrder((prev) => prev.filter((key) => key !== eventKey));
 };
 
-const movePhase = (fromKey, toKey) => {
-  if (!fromKey || !toKey || fromKey === toKey) return;
+const parseCardLines = (value) =>
+  value
+    .split("||")
+    .map((line) => line.trim())
+    .filter(Boolean);
 
-  const currentKeys = orderedPhases.map((phase) => phase.key);
-  const nextKeys = [...currentKeys];
-  const fromIndex = nextKeys.indexOf(fromKey);
-  const toIndex = nextKeys.indexOf(toKey);
+const addInfoCard = async () => {
+  const title = window.prompt("카드 제목을 입력해주세요.");
+  if (!title) return;
 
-  if (fromIndex === -1 || toIndex === -1) return;
+  const linesInput = window.prompt(
+    "본문을 입력해주세요. 여러 줄은 || 로 구분해주세요.\n예: 첫 줄 || 둘째 줄 || 셋째 줄"
+  );
+  const lines = parseCardLines(linesInput || "");
+  if (lines.length === 0) return;
 
-  nextKeys.splice(fromIndex, 1);
-  nextKeys.splice(toIndex, 0, fromKey);
+  const nextOrder = infoCards.length > 0 ? Math.max(...infoCards.map((card) => card.sort_order || 0)) + 1 : 1;
+  const { data, error } = await supabase
+    .from("timeline_info_cards")
+    .insert({ title, lines, sort_order: nextOrder })
+    .select("*")
+    .single();
+
+  if (error) {
+    alert(error.message);
+    console.log(error);
+    return;
+  }
+
+  setInfoCards((prev) => [...prev, data].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
+};
+
+const updateInfoCard = async (cardId) => {
+  const targetCard = infoCards.find((card) => card.id === cardId);
+  if (!targetCard) return;
+
+  const nextTitle = window.prompt("카드 제목 수정", targetCard.title);
+  if (!nextTitle) return;
+
+  const nextLinesInput = window.prompt(
+    "본문 수정. 여러 줄은 || 로 구분해주세요.",
+    (targetCard.lines || []).join(" || ")
+  );
+  const nextLines = parseCardLines(nextLinesInput || "");
+  if (nextLines.length === 0) return;
+
+  const { error } = await supabase
+    .from("timeline_info_cards")
+    .update({ title: nextTitle, lines: nextLines })
+    .eq("id", cardId);
+
+  if (error) {
+    alert(error.message);
+    console.log(error);
+    return;
+  }
+
+  setInfoCards((prev) =>
+    prev.map((card) => (card.id === cardId ? { ...card, title: nextTitle, lines: nextLines } : card))
+  );
+};
+
+const deleteInfoCard = async (cardId) => {
+  const ok = window.confirm("이 카드를 삭제할까요?");
+  if (!ok) return;
+
+  const { error } = await supabase.from("timeline_info_cards").delete().eq("id", cardId);
+
+  if (error) {
+    alert(error.message);
+    console.log(error);
+    return;
+  }
+
+  setInfoCards((prev) => prev.filter((card) => card.id !== cardId));
+};
+
+const reorderPhases = (nextKeys) => {
   setPhaseOrder(nextKeys);
+};
+
+const movePhaseByOffset = (phaseKey, offset) => {
+  const currentKeys = orderedPhases.map((phase) => phase.key);
+  const currentIndex = currentKeys.indexOf(phaseKey);
+  const nextIndex = currentIndex + offset;
+
+  if (currentIndex === -1 || nextIndex < 0 || nextIndex >= currentKeys.length) return;
+
+  const nextKeys = [...currentKeys];
+  const [moved] = nextKeys.splice(currentIndex, 1);
+  nextKeys.splice(nextIndex, 0, moved);
+  reorderPhases(nextKeys);
 };
 
   const toggleOwner = async (phaseIndex, itemIndex, owner, bucket = "items") => {
@@ -549,33 +623,38 @@ const movePhase = (fromKey, toKey) => {
     );
   };
 
-  const renderPhaseWrapper = (phase, content) => (
-    <div
-      key={phase.key}
-      draggable
-      onDragStart={(event) => {
-        setDraggedPhaseKey(phase.key);
-        event.dataTransfer.effectAllowed = "move";
-      }}
-      onDragOver={(event) => {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
-      }}
-      onDragEnter={(event) => {
-        event.preventDefault();
-        if (!draggedPhaseKey || draggedPhaseKey === phase.key) return;
-        movePhase(draggedPhaseKey, phase.key);
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        setDraggedPhaseKey(null);
-      }}
-      onDragEnd={() => setDraggedPhaseKey(null)}
-      className={`cursor-move ${draggedPhaseKey === phase.key ? "opacity-70" : ""}`}
-    >
-      {content}
-    </div>
-  );
+  const renderMoveButtons = (phase) => {
+    const currentIndex = orderedPhases.findIndex((item) => item.key === phase.key);
+    const isFirst = currentIndex <= 0;
+    const isLast = currentIndex === orderedPhases.length - 1;
+
+    return (
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => movePhaseByOffset(phase.key, -1)}
+          disabled={isFirst}
+          className="rounded-md p-2 text-gray-500 transition hover:bg-gray-100 hover:text-black disabled:cursor-not-allowed disabled:opacity-30"
+          aria-label="위로 이동"
+          title="위로 이동"
+        >
+          <ChevronUp className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => movePhaseByOffset(phase.key, 1)}
+          disabled={isLast}
+          className="rounded-md p-2 text-gray-500 transition hover:bg-gray-100 hover:text-black disabled:cursor-not-allowed disabled:opacity-30"
+          aria-label="아래로 이동"
+          title="아래로 이동"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  };
+
+  const renderPhaseWrapper = (phase, content) => <div key={phase.key}>{content}</div>;
 
   const renderChecklist = (items, phaseIndex, bucket = "items") => (
     <>
@@ -668,26 +747,29 @@ const movePhase = (fromKey, toKey) => {
       <div className="rounded-2xl border-2 border-yellow-500 bg-yellow-100 p-5 shadow-sm max-[767px]:p-4">
         <div className="mb-1 flex items-start justify-between gap-3">
           <div className="text-xs font-semibold text-yellow-700">{phase.title}</div>
-          {phase.isCustom ? (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => updateCustomBox(phase.key)}
-                className="rounded-md p-2 text-gray-600 transition hover:bg-yellow-200/70 hover:text-black"
-                aria-label="박스 수정"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => removeCustomEvent(phase.key)}
-                className="rounded-md p-2 text-gray-600 transition hover:bg-yellow-200/70 hover:text-black"
-                aria-label="박스 삭제"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ) : null}
+          <div className="flex items-center gap-1">
+            {renderMoveButtons(phase)}
+            {phase.isCustom ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => updateCustomBox(phase.key)}
+                  className="rounded-md p-2 text-gray-600 transition hover:bg-yellow-200/70 hover:text-black"
+                  aria-label="박스 수정"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeCustomEvent(phase.key)}
+                  className="rounded-md p-2 text-gray-600 transition hover:bg-yellow-200/70 hover:text-black"
+                  aria-label="박스 삭제"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
         <h2 className="mb-3 text-xl font-bold text-yellow-900 max-[767px]:text-lg">{phase.subtitle}</h2>
         <ul className="mb-4 space-y-1.5 text-sm leading-6 max-[767px]:space-y-2">
@@ -764,26 +846,29 @@ const movePhase = (fromKey, toKey) => {
       <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 shadow-sm max-[767px]:p-4">
         <div className="mb-1 flex items-start justify-between gap-3">
           <div className="text-xs font-semibold text-gray-500">{phase.title}</div>
-          {phase.isCustom ? (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => updateCustomBox(phase.key)}
-                className="rounded-md p-2 text-gray-600 transition hover:bg-gray-100 hover:text-black"
-                aria-label="박스 수정"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => removeCustomEvent(phase.key)}
-                className="rounded-md p-2 text-gray-600 transition hover:bg-gray-100 hover:text-black"
-                aria-label="박스 삭제"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ) : null}
+          <div className="flex items-center gap-1">
+            {renderMoveButtons(phase)}
+            {phase.isCustom ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => updateCustomBox(phase.key)}
+                  className="rounded-md p-2 text-gray-600 transition hover:bg-gray-100 hover:text-black"
+                  aria-label="박스 수정"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeCustomEvent(phase.key)}
+                  className="rounded-md p-2 text-gray-600 transition hover:bg-gray-100 hover:text-black"
+                  aria-label="박스 삭제"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
         <h2 className="mb-3 text-xl font-bold leading-tight max-[767px]:text-lg">{phase.subtitle}</h2>
         {renderPrioritySection(phase)}
@@ -817,42 +902,52 @@ const movePhase = (fromKey, toKey) => {
   );
 
   const renderInfoSections = () => (
-    <>
-      <div className="mt-8 rounded-[28px] border-2 border-black bg-gray-50 p-5 max-[767px]:rounded-2xl max-[767px]:p-4">
-        <h3 className="mb-3 text-xl font-bold max-[767px]:text-lg">사이트 제작 참고 정보</h3>
-        <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm font-medium leading-6 tracking-tight max-[767px]:grid-cols-1 max-[767px]:gap-y-1 max-[767px]:text-xs max-[767px]:leading-5">
-          {referenceInfo.map((item) => (
-            <div key={item}>• {item}</div>
-          ))}
-        </div>
+    <div className="mt-6">
+      <div className="mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={addInfoCard}
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-400 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+        >
+          <Plus className="h-4 w-4" /> 정보 카드 추가
+        </button>
       </div>
-
-      <div className="mt-6 grid grid-cols-2 gap-4 max-[767px]:grid-cols-1">
-        <div className="rounded-[28px] border-2 border-black bg-gray-100 p-5 max-[767px]:rounded-2xl max-[767px]:p-4">
-          <h3 className="mb-3 text-xl font-bold max-[767px]:text-lg">사장님/대표님 확인</h3>
-          <ul className="space-y-2 text-sm font-medium leading-6 max-[767px]:space-y-1.5">
-            {ownerChecks.map((item) => (
-              <li key={item}>• {item}</li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="rounded-[28px] border-2 border-black bg-gray-100 p-5 max-[767px]:rounded-2xl max-[767px]:p-4">
-          <h3 className="mb-3 text-xl font-bold max-[767px]:text-lg">주요 리스크</h3>
-          <ul className="mb-4 space-y-2 text-sm font-medium leading-6 max-[767px]:space-y-1.5">
-            {risks.map((item) => (
-              <li key={item}>• {item}</li>
-            ))}
-          </ul>
-          <h3 className="mb-2 text-xl font-bold max-[767px]:text-lg">핵심 포인트</h3>
-          <p className="text-sm font-medium leading-6">
-            가장 중요한 일정은 <span className="font-bold">4월 내 개발사 선정 완료</span>
-            입니다. 6월 15일 오픈은 공격적 일정이며, QA 지연 시 6월 말까지 버퍼를 확보해야
-            안전합니다.
-          </p>
-        </div>
+      <div className="grid grid-cols-2 gap-4 max-[767px]:grid-cols-1">
+        {infoCards.map((card) => (
+          <div
+            key={card.id}
+            className="rounded-[28px] border-2 border-black bg-gray-50 p-5 max-[767px]:rounded-2xl max-[767px]:p-4"
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <h3 className="text-lg font-bold max-[767px]:text-base">{card.title}</h3>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => updateInfoCard(card.id)}
+                  className="rounded-md p-2 text-gray-600 transition hover:bg-gray-100 hover:text-black"
+                  aria-label="카드 수정"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteInfoCard(card.id)}
+                  className="rounded-md p-2 text-gray-600 transition hover:bg-gray-100 hover:text-black"
+                  aria-label="카드 삭제"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] font-medium leading-5 tracking-tight text-gray-700 max-[767px]:grid-cols-1">
+              {(card.lines || []).map((line) => (
+                <div key={`${card.id}-${line}`}>• {line}</div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
-    </>
+    </div>
   );
 
   const renderGanttSection = () => (
