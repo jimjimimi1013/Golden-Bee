@@ -355,11 +355,11 @@ const deleteItem = async (phaseIndex, itemIndex, bucket = "items") => {
 
   const renderChecklist = (items, phaseIndex, bucket = "items") => (
     <>
-      <ul className="mb-4 space-y-2 text-sm leading-6 sm:space-y-1.5">
+      <ul className="mb-4 space-y-1.5 text-sm leading-6 max-[767px]:space-y-2">
         {items.map((item, i) => (
           <li
             key={item.id ?? i}
-            className="rounded-xl border border-gray-200 bg-white/80 p-3 sm:border-0 sm:bg-transparent sm:p-0"
+            className="max-[767px]:rounded-xl max-[767px]:border max-[767px]:border-gray-200 max-[767px]:bg-white/80 max-[767px]:p-3"
           >
             <div className="flex items-start gap-2">
             <button
@@ -369,15 +369,15 @@ const deleteItem = async (phaseIndex, itemIndex, bucket = "items") => {
             >
               <Check className={`h-4 w-4 ${item.done ? "opacity-100" : "opacity-30"}`} />
             </button>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex flex-1 items-start gap-3 max-[767px]:block">
               <div
-                className={`break-words pr-1 text-[15px] leading-6 sm:text-sm ${
+                className={`flex-1 break-words pr-1 ${
                   item.done ? "line-through opacity-40" : ""
                 }`}
               >
                 {item.text}
               </div>
-              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="mt-2 hidden flex-col gap-2 max-[767px]:flex">
                 {renderOwnerButtons(item, phaseIndex, i, bucket)}
                 <div className="flex items-center gap-1 self-end sm:self-auto">
                   <button
@@ -398,6 +398,27 @@ const deleteItem = async (phaseIndex, itemIndex, bucket = "items") => {
                   </button>
                 </div>
               </div>
+              <div className="shrink-0 max-[767px]:hidden">
+                {renderOwnerButtons(item, phaseIndex, i, bucket)}
+              </div>
+            </div>
+            <div className="max-[767px]:hidden flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => editItem(phaseIndex, i, item.text, bucket)}
+                className="text-gray-600 hover:text-black"
+                aria-label="항목 수정"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteItem(phaseIndex, i, bucket)}
+                className="text-gray-600 hover:text-black"
+                aria-label="항목 삭제"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             </div>
             </div>
           </li>
@@ -406,7 +427,7 @@ const deleteItem = async (phaseIndex, itemIndex, bucket = "items") => {
       <button
         type="button"
         onClick={() => addItem(phaseIndex, bucket)}
-        className="mt-2 inline-flex min-h-10 items-center gap-1 rounded-lg border bg-white px-3 py-2 text-sm hover:bg-gray-100 sm:min-h-0 sm:px-2 sm:py-1 sm:text-xs"
+        className="mt-2 inline-flex items-center gap-1 rounded-lg border bg-white px-2 py-1 text-xs hover:bg-gray-100 max-[767px]:min-h-10 max-[767px]:px-3 max-[767px]:py-2 max-[767px]:text-sm"
       >
         <Plus className="h-3 w-3" /> 항목 추가
       </button>
@@ -414,22 +435,22 @@ const deleteItem = async (phaseIndex, itemIndex, bucket = "items") => {
   );
 
   const renderEvent = (phase, key, phaseIndex) => (
-    <div key={key} className="relative pl-5 sm:pl-7">
-      <div className="absolute -left-[10px] top-2 h-4 w-4 rounded-full border-[3px] border-black bg-yellow-400 sm:-left-[12px] sm:h-5 sm:w-5 sm:border-4" />
-      <div className="rounded-2xl border-2 border-yellow-500 bg-yellow-100 p-4 shadow-sm sm:p-5">
+    <div key={key} className="relative pl-7 max-[767px]:pl-5">
+      <div className="absolute -left-[12px] top-2 h-5 w-5 rounded-full border-4 border-black bg-yellow-400 max-[767px]:-left-[10px] max-[767px]:h-4 max-[767px]:w-4 max-[767px]:border-[3px]" />
+      <div className="rounded-2xl border-2 border-yellow-500 bg-yellow-100 p-5 shadow-sm max-[767px]:p-4">
         <div className="text-xs font-semibold text-yellow-700 mb-1">{phase.title}</div>
-        <h2 className="mb-3 text-lg font-bold text-yellow-900 sm:text-xl">{phase.subtitle}</h2>
-        <ul className="mb-4 space-y-2 text-sm leading-6 sm:space-y-1.5">
+        <h2 className="mb-3 text-xl font-bold text-yellow-900 max-[767px]:text-lg">{phase.subtitle}</h2>
+        <ul className="mb-4 space-y-1.5 text-sm leading-6 max-[767px]:space-y-2">
           {phase.items.map((item, i) => (
             <li
               key={item.id ?? i}
-              className="rounded-xl border border-yellow-300/80 bg-white/70 p-3 sm:border-0 sm:bg-transparent sm:p-0"
+              className="max-[767px]:rounded-xl max-[767px]:border max-[767px]:border-yellow-300/80 max-[767px]:bg-white/70 max-[767px]:p-3"
             >
               <div className="flex items-start gap-2">
               <span className="mt-1">•</span>
-              <div className="min-w-0 flex-1">
-                <div className="break-words pr-1 text-[15px] leading-6 sm:text-sm">{item.text}</div>
-                <div className="mt-2 flex items-center justify-end gap-1">
+              <div className="min-w-0 flex flex-1 items-start gap-3 max-[767px]:block">
+                <div className="flex-1 break-words pr-1">{item.text}</div>
+                <div className="mt-2 hidden items-center justify-end gap-1 max-[767px]:flex">
                   <button
                     type="button"
                     onClick={() => editItem(phaseIndex, i, item.text, "items")}
@@ -448,6 +469,24 @@ const deleteItem = async (phaseIndex, itemIndex, bucket = "items") => {
                   </button>
                 </div>
               </div>
+              <div className="flex items-center gap-1 max-[767px]:hidden">
+                <button
+                  type="button"
+                  onClick={() => editItem(phaseIndex, i, item.text, "items")}
+                  className="text-gray-600 hover:text-black"
+                  aria-label="항목 수정"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteItem(phaseIndex, i, "items")}
+                  className="text-gray-600 hover:text-black"
+                  aria-label="항목 삭제"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
               </div>
             </li>
           ))}
@@ -455,7 +494,7 @@ const deleteItem = async (phaseIndex, itemIndex, bucket = "items") => {
         <button
           type="button"
           onClick={() => addItem(phaseIndex, "items")}
-          className="mt-2 inline-flex min-h-10 items-center gap-1 rounded-lg border bg-white px-3 py-2 text-sm hover:bg-yellow-200 sm:min-h-0 sm:px-2 sm:py-1 sm:text-xs"
+          className="mt-2 inline-flex items-center gap-1 rounded-lg border bg-white px-2 py-1 text-xs hover:bg-yellow-200 max-[767px]:min-h-10 max-[767px]:px-3 max-[767px]:py-2 max-[767px]:text-sm"
         >
           <Plus className="h-3 w-3" /> 항목 추가
         </button>
@@ -464,11 +503,11 @@ const deleteItem = async (phaseIndex, itemIndex, bucket = "items") => {
   );
 
   const renderPhase = (phase, key, phaseIndex) => (
-    <div key={key} className="relative pl-5 sm:pl-7">
-      <div className="absolute -left-[10px] top-2 h-4 w-4 rounded-full border-[3px] border-black bg-white sm:-left-[12px] sm:h-5 sm:w-5 sm:border-4" />
-      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 shadow-sm sm:p-5">
+    <div key={key} className="relative pl-7 max-[767px]:pl-5">
+      <div className="absolute -left-[12px] top-2 h-5 w-5 rounded-full border-4 border-black bg-white max-[767px]:-left-[10px] max-[767px]:h-4 max-[767px]:w-4 max-[767px]:border-[3px]" />
+      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 shadow-sm max-[767px]:p-4">
         <div className="text-xs font-semibold text-gray-500 mb-1">{phase.title}</div>
-        <h2 className="mb-3 text-lg font-bold leading-tight sm:text-xl">{phase.subtitle}</h2>
+        <h2 className="mb-3 text-xl font-bold leading-tight max-[767px]:text-lg">{phase.subtitle}</h2>
         {renderChecklist(phase.items, phaseIndex, "items")}
         <div className="mt-4 border-t pt-3">
           <div className="text-xs font-semibold text-gray-500 mb-2">기타 업무</div>
@@ -483,38 +522,38 @@ const deleteItem = async (phaseIndex, itemIndex, bucket = "items") => {
 
   return (
     <>
-      <div className="px-4 pt-4 sm:p-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="p-4 max-[767px]:px-4 max-[767px]:pt-4">
+        <div className="flex flex-row flex-wrap items-center gap-2 max-[767px]:flex-col">
         <button
           onClick={addTestTask}
-          className="min-h-11 rounded-lg border border-black px-3 py-2 text-sm font-semibold"
+          className="rounded-lg border border-black px-3 py-2 text-sm font-semibold max-[767px]:min-h-11"
         >
           테스트 추가
         </button>
 
         <button
           onClick={seedInitialData}
-          className="min-h-11 rounded-lg border border-black px-3 py-2 text-sm font-semibold"
+          className="rounded-lg border border-black px-3 py-2 text-sm font-semibold max-[767px]:min-h-11"
         >
           초기 데이터 업로드
         </button>
         </div>
 
-        <div className="mb-4 mt-3 text-xs text-gray-500 sm:mt-4">
+        <div className="mb-4 mt-4 text-xs text-gray-500 max-[767px]:mt-3">
           Supabase 테스트 데이터 수: {tasks.length}
         </div>
       </div>
 
-      <div className="min-h-screen bg-white px-4 pb-8 pt-2 font-sans sm:p-5">
+      <div className="min-h-screen bg-white p-5 font-sans max-[767px]:px-4 max-[767px]:pb-8 max-[767px]:pt-2">
         <div className="max-w-5xl mx-auto">
-          <h1 className="mb-2 text-2xl font-bold leading-tight sm:text-3xl">
+          <h1 className="mb-2 text-3xl font-bold leading-tight max-[767px]:text-2xl">
             더 골든비 신규 쇼핑몰 구축 타임라인
           </h1>
-          <p className="mb-5 text-sm text-gray-600 sm:mb-6 sm:text-base">
+          <p className="mb-6 text-base text-gray-600 max-[767px]:mb-5 max-[767px]:text-sm">
             목표 오픈: 6월 15일 / 안정 오픈: 6월 말
           </p>
 
-          <div className="relative ml-2 space-y-4 border-l-4 border-black sm:ml-3 sm:space-y-6">
+          <div className="relative ml-3 space-y-6 border-l-4 border-black max-[767px]:ml-2 max-[767px]:space-y-4">
             {phaseData.map((phase, idx) =>
               phase.type === "event"
                 ? renderEvent(phase, `phase-${idx}`, idx)
