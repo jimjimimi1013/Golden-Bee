@@ -503,6 +503,88 @@ const deleteInfoCard = async (cardId) => {
   setInfoCards((prev) => prev.filter((card) => card.id !== cardId));
 };
 
+const addInfoLine = async (cardId) => {
+  const targetCard = infoCards.find((card) => card.id === cardId);
+  if (!targetCard) return;
+
+  const nextLine = window.prompt("추가할 항목을 입력해주세요.");
+  if (!nextLine) return;
+
+  const nextLines = [...(targetCard.lines || []), nextLine.trim()].filter(Boolean);
+  const { error } = await supabase
+    .from("timeline_info_cards")
+    .update({ lines: nextLines })
+    .eq("id", cardId);
+
+  if (error) {
+    alert(error.message);
+    console.log(error);
+    return;
+  }
+
+  setInfoCards((prev) =>
+    prev.map((card) => (card.id === cardId ? { ...card, lines: nextLines } : card))
+  );
+};
+
+const updateInfoLine = async (cardId, lineIndex) => {
+  const targetCard = infoCards.find((card) => card.id === cardId);
+  if (!targetCard) return;
+
+  const currentLine = targetCard.lines?.[lineIndex];
+  if (!currentLine) return;
+
+  const nextLine = window.prompt("항목 수정", currentLine);
+  if (!nextLine) return;
+
+  const nextLines = [...(targetCard.lines || [])];
+  nextLines[lineIndex] = nextLine.trim();
+
+  const { error } = await supabase
+    .from("timeline_info_cards")
+    .update({ lines: nextLines })
+    .eq("id", cardId);
+
+  if (error) {
+    alert(error.message);
+    console.log(error);
+    return;
+  }
+
+  setInfoCards((prev) =>
+    prev.map((card) => (card.id === cardId ? { ...card, lines: nextLines } : card))
+  );
+};
+
+const deleteInfoLine = async (cardId, lineIndex) => {
+  const targetCard = infoCards.find((card) => card.id === cardId);
+  if (!targetCard) return;
+
+  const ok = window.confirm("이 항목을 삭제할까요?");
+  if (!ok) return;
+
+  const nextLines = (targetCard.lines || []).filter((_, index) => index !== lineIndex);
+  if (nextLines.length === 0) {
+    alert("카드에는 최소 1개 항목이 필요합니다. 카드 전체를 지우려면 카드 삭제를 사용해주세요.");
+    return;
+  }
+
+  const { error } = await supabase
+    .from("timeline_info_cards")
+    .update({ lines: nextLines })
+    .eq("id", cardId);
+
+  if (error) {
+    alert(error.message);
+    console.log(error);
+    return;
+  }
+
+  setInfoCards((prev) =>
+    prev.map((card) => (card.id === cardId ? { ...card, lines: nextLines } : card))
+  );
+};
+
 const reorderPhases = (nextKeys) => {
   setPhaseOrder(nextKeys);
 };
@@ -912,7 +994,7 @@ const movePhaseByOffset = (phaseKey, offset) => {
           <Plus className="h-4 w-4" /> 정보 카드 추가
         </button>
       </div>
-      <div className="grid grid-cols-2 gap-4 max-[767px]:grid-cols-1">
+      <div className="grid grid-cols-1 gap-4">
         {infoCards.map((card) => (
           <div
             key={card.id}
@@ -921,6 +1003,15 @@ const movePhaseByOffset = (phaseKey, offset) => {
             <div className="mb-3 flex items-start justify-between gap-3">
               <h3 className="text-lg font-bold max-[767px]:text-base">{card.title}</h3>
               <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => addInfoLine(card.id)}
+                  className="rounded-md p-2 text-gray-600 transition hover:bg-gray-100 hover:text-black"
+                  aria-label="항목 추가"
+                  title="항목 추가"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
                 <button
                   type="button"
                   onClick={() => updateInfoCard(card.id)}
@@ -940,8 +1031,31 @@ const movePhaseByOffset = (phaseKey, offset) => {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] font-medium leading-5 tracking-tight text-gray-700 max-[767px]:grid-cols-1">
-              {(card.lines || []).map((line) => (
-                <div key={`${card.id}-${line}`}>• {line}</div>
+              {(card.lines || []).map((line, lineIndex) => (
+                <div
+                  key={`${card.id}-${lineIndex}`}
+                  className="group flex items-start justify-between gap-2 rounded-lg px-1 py-1"
+                >
+                  <div className="min-w-0 flex-1">• {line}</div>
+                  <div className="flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100 max-[767px]:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => updateInfoLine(card.id, lineIndex)}
+                      className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black"
+                      aria-label="항목 수정"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteInfoLine(card.id, lineIndex)}
+                      className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-black"
+                      aria-label="항목 삭제"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
