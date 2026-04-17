@@ -1030,7 +1030,7 @@ const movePhaseByOffset = (phaseKey, offset) => {
                 </button>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] font-medium leading-5 tracking-tight text-gray-700 max-[767px]:grid-cols-1">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm font-medium leading-6 tracking-tight text-gray-700 max-[767px]:grid-cols-1">
               {(card.lines || []).map((line, lineIndex) => (
                 <div
                   key={`${card.id}-${lineIndex}`}
